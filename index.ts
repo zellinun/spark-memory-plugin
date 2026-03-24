@@ -68,10 +68,27 @@ class SparkClient {
 // ============================================================================
 
 const CAPTURE_TRIGGERS = [
+  // Preferences & needs
   /\b(prefer|always|never|hate|love|want|need)\b/i,
   /\b(remember|don't forget|important|note that|fyi)\b/i,
   /\b(decided|decision|we'll use|going with|switched to)\b/i,
-  /\b(actually|correction|wrong|not \w+, it's|changed to)\b/i,
+
+  // Corrections (enhanced)
+  /\b(actually|correction|wrong|not \w+,?\s*it's|changed to)\b/i,
+  /\bno,?\s*that'?s?\s*not\s*(right|correct)\b/i,
+  /\bi\s*told\s*you\s*before\b/i,
+  /\bstop\s*doing\b/i,
+  /\bwhy\s*do\s*you\s*keep\b/i,
+  /\bthat\s*was\s*wrong\b/i,
+  /\blet\s*me\s*correct\b/i,
+  /\bfor\s*the\s*record\b/i,
+  /\bjust\s*so\s*you\s*know\b/i,
+  /\bgoing\s*forward,?\s*(always|never)\b/i,
+  /\bfrom\s*now\s*on\b/i,
+  /\brule:?\s/i,
+  /\bpolicy:?\s/i,
+
+  // Business facts
   /\b(gate code|password|pin|access code)\b/i,
   /\b(hours are|pricing is|we charge|rate is|costs?)\b/i,
   /\b(my (name|email|phone|address) is)\b/i,
@@ -111,17 +128,26 @@ function shouldCapture(text: string): boolean {
 
 function detectEpisodeType(text: string): { type: string; importance: number } {
   const lower = text.toLowerCase();
-  if (/actually|correction|wrong|not \w+.{0,10}it's|changed to/i.test(lower)) {
+
+  // Corrections get highest importance (9)
+  if (/actually|correction|wrong|not \w+.{0,10}it's|changed to|told you before|stop doing|why do you keep/i.test(lower)) {
+    return { type: 'user_feedback', importance: 9 };
+  }
+  // Explicit rules/policies (8)
+  if (/from now on|going forward|rule:|policy:|always do|never do/i.test(lower)) {
     return { type: 'user_feedback', importance: 8 };
   }
-  if (/prefer|always|never|hate|love|want/i.test(lower)) {
-    return { type: 'observation', importance: 6 };
-  }
+  // Decisions (7)
   if (/decided|decision|we'll use|going with/i.test(lower)) {
     return { type: 'action', importance: 7 };
   }
+  // Business facts (7)
   if (/gate code|password|pin|access|hours are|pricing|charge|rate/i.test(lower)) {
     return { type: 'observation', importance: 7 };
+  }
+  // Preferences (6)
+  if (/prefer|always|never|hate|love|want/i.test(lower)) {
+    return { type: 'observation', importance: 6 };
   }
   return { type: 'observation', importance: 5 };
 }
