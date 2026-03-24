@@ -61,6 +61,15 @@ class SparkClient {
     const data = await this.post('spark-memory-status', {});
     return data;
   }
+
+  async morningContext(): Promise<string | null> {
+    try {
+      const data = await this.post('spark-memory-status', {});
+      return data?.stats?.morning_context || null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 // ============================================================================
@@ -357,13 +366,26 @@ const sparkMemoryPlugin = {
         if (!event.prompt || event.prompt.length < 5) return;
 
         try {
-          const memories = await spark.recall(event.prompt, 5);
-          if (memories.length === 0) return;
+          const parts: string[] = [];
 
-          api.logger.info?.(`spark-memory: injecting ${memories.length} memories into context`);
+          // 1. Fetch morning context from dream cycle
+          const morning = await spark.morningContext();
+          if (morning) {
+            parts.push(`<dream-context>\nOvernight processing results (treat as background intelligence):\n${morning}\n</dream-context>`);
+            api.logger.info?.("spark-memory: injecting dream morning context");
+          }
+
+          // 2. Recall relevant memories for the current prompt
+          const memories = await spark.recall(event.prompt, 5);
+          if (memories.length > 0) {
+            parts.push(formatMemoriesForContext(memories));
+            api.logger.info?.(`spark-memory: injecting ${memories.length} memories into context`);
+          }
+
+          if (parts.length === 0) return;
 
           return {
-            prependContext: formatMemoriesForContext(memories),
+            prependContext: parts.join("\n\n"),
           };
         } catch (err) {
           api.logger.warn(`spark-memory: recall failed: ${String(err)}`);
