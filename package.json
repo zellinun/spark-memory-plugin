@@ -12,6 +12,11 @@
     "persistent-memory",
     "ai-memory"
   ],
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
   "author": "Zellin Unlimited <hello@zellin.ai>",
   "license": "MIT",
   "repository": {
