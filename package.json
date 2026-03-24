@@ -1,0 +1,27 @@
+{
+  "name": "@zellin/spark-memory",
+  "version": "0.1.0",
+  "description": "Persistent memory plugin for OpenClaw — records what matters, reflects overnight, recalls with intelligence",
+  "main": "index.ts",
+  "type": "module",
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "memory",
+    "spark",
+    "persistent-memory",
+    "ai-memory"
+  ],
+  "author": "Zellin Unlimited <hello@zellin.ai>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zellinun/spark-memory-plugin"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2025.0.0"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0"
+  }
+}

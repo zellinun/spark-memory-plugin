@@ -1,0 +1,43 @@
+{
+  "id": "spark-memory",
+  "kind": "memory",
+  "uiHints": {
+    "apiKey": {
+      "label": "Spark API Key",
+      "sensitive": true,
+      "placeholder": "spark_xxxx...",
+      "help": "Get your API key at https://zellin.ai"
+    },
+    "orgId": {
+      "label": "Organization ID",
+      "placeholder": "auto-assigned on signup",
+      "help": "Your Spark organization ID"
+    },
+    "apiUrl": {
+      "label": "API URL",
+      "placeholder": "https://aotmggizxfetxguthmuf.supabase.co/functions/v1",
+      "help": "Spark API endpoint (default is fine for most users)",
+      "advanced": true
+    },
+    "autoCapture": {
+      "label": "Auto-Capture",
+      "help": "Automatically capture important information from conversations"
+    },
+    "autoRecall": {
+      "label": "Auto-Recall",
+      "help": "Automatically inject relevant memories into context before each session"
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiKey": { "type": "string" },
+      "orgId": { "type": "string" },
+      "apiUrl": { "type": "string" },
+      "autoCapture": { "type": "boolean" },
+      "autoRecall": { "type": "boolean" }
+    },
+    "required": ["apiKey", "orgId"]
+  }
+}
