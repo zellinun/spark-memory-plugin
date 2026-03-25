@@ -62,6 +62,10 @@ class SparkClient {
     return data;
   }
 
+  async insights(section = 'all'): Promise<any> {
+    return this.post('spark-memory-insights', { section });
+  }
+
   async morningContext(): Promise<string | null> {
     try {
       const data = await this.post('spark-memory-status', {});
@@ -322,6 +326,114 @@ const sparkMemoryPlugin = {
         },
       },
       { name: "memory_status" },
+    );
+
+    api.registerTool(
+      {
+        name: "memory_patterns",
+        label: "Spark Memory Patterns",
+        description:
+          "Show detected patterns and behavioral rules. Use when user asks 'what have you learned about me?', 'what patterns do you see?', 'what do you know about how I work?'",
+        parameters: Type.Object({}),
+        async execute() {
+          try {
+            const data = await spark.insights('patterns');
+            const patterns = data.patterns || [];
+
+            if (patterns.length === 0) {
+              return {
+                content: [{ type: "text", text: "No patterns detected yet. Patterns emerge after 3+ repeated behaviors." }],
+                details: { count: 0 },
+              };
+            }
+
+            const text = patterns
+              .map(
+                (p: any, i: number) =>
+                  `${i + 1}. ${p.is_confirmed ? '✅' : '🔄'} ${p.content} (seen ${p.occurrence_count}x, strength: ${(p.strength * 100).toFixed(0)}%)`,
+              )
+              .join('\n');
+
+            return {
+              content: [{ type: "text", text: `${patterns.length} patterns detected:\n\n${text}` }],
+              details: { count: patterns.length, patterns },
+            };
+          } catch (err) {
+            return {
+              content: [{ type: "text", text: `Pattern retrieval failed: ${String(err)}` }],
+              details: { error: String(err) },
+            };
+          }
+        },
+      },
+      { name: "memory_patterns" },
+    );
+
+    api.registerTool(
+      {
+        name: "memory_insights",
+        label: "Spark Memory Insights",
+        description:
+          "Show recent reflections and dream insights. Use when user asks 'what did you learn?', 'any insights?', 'what happened overnight?', 'what did you dream about?'",
+        parameters: Type.Object({
+          section: Type.Optional(
+            Type.String({
+              description: "insights, dreams, corrections, tiers, or all (default: all)",
+            }),
+          ),
+        }),
+        async execute(_toolCallId, params) {
+          const section = (params as { section?: string }).section || 'all';
+
+          try {
+            const data = await spark.insights(section);
+            const parts: string[] = [];
+
+            if (data.insights?.length) {
+              parts.push(`📊 Recent Insights (${data.insights.length}):`);
+              for (const r of data.insights.slice(0, 5)) {
+                const tierIcon = r.tier === 'hot' ? '🔥' : r.tier === 'cold' ? '❄️' : '';
+                parts.push(`  ${tierIcon} [${r.reflection_type}] ${r.content.slice(0, 150)}`);
+              }
+            }
+
+            if (data.dreams?.length) {
+              parts.push(`\n💤 Dream Outputs (${data.dreams.length}):`);
+              for (const d of data.dreams.slice(0, 3)) {
+                const preview = typeof d.content === 'object' ? JSON.stringify(d.content).slice(0, 150) : String(d.content).slice(0, 150);
+                parts.push(`  [${d.dream_phase}] ${preview}`);
+              }
+            }
+
+            if (data.corrections?.length) {
+              parts.push(`\n✏️ Corrections Tracked (${data.corrections.length}):`);
+              for (const c of data.corrections.slice(0, 5)) {
+                parts.push(`  ${c.content.slice(0, 100)}`);
+              }
+            }
+
+            if (data.tiers) {
+              const rt = data.tiers.reflections || {};
+              const pt = data.tiers.patterns || {};
+              parts.push(`\n🧠 Memory Tiers:`);
+              parts.push(`  Reflections: 🔥 HOT ${rt.hot || 0} · WARM ${rt.warm || 0} · ❄️ COLD ${rt.cold || 0}`);
+              parts.push(`  Patterns: 🔥 HOT ${pt.hot || 0} · WARM ${pt.warm || 0} · ❄️ COLD ${pt.cold || 0}`);
+            }
+
+            const text = parts.length > 0 ? parts.join('\n') : 'No insights yet. They build up after a few days of use.';
+            return {
+              content: [{ type: "text", text }],
+              details: data,
+            };
+          } catch (err) {
+            return {
+              content: [{ type: "text", text: `Insights retrieval failed: ${String(err)}` }],
+              details: { error: String(err) },
+            };
+          }
+        },
+      },
+      { name: "memory_insights" },
     );
 
     // ========================================================================
