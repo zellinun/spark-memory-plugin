@@ -74,6 +74,23 @@ class SparkClient {
       return null;
     }
   }
+
+  async preloadIntelligence(): Promise<{ morning: string | null; patterns: any[]; insights: any[]; corrections: any[] }> {
+    try {
+      const [statusData, insightsData] = await Promise.all([
+        this.post('spark-memory-status', {}),
+        this.post('spark-memory-insights', { section: 'all' }),
+      ]);
+      return {
+        morning: statusData?.stats?.morning_context || null,
+        patterns: (insightsData?.patterns || []).filter((p: any) => p.is_confirmed).slice(0, 20),
+        insights: (insightsData?.insights || []).filter((i: any) => i.tier === 'hot' || i.importance_score >= 7).slice(0, 15),
+        corrections: (insightsData?.corrections || []).slice(0, 10),
+      };
+    } catch {
+      return { morning: null, patterns: [], insights: [], corrections: [] };
+    }
+  }
 }
 
 // ============================================================================
@@ -501,18 +518,37 @@ const sparkMemoryPlugin = {
         try {
           const parts: string[] = [];
 
-          // 1. Fetch morning context from dream cycle
-          const morning = await spark.morningContext();
-          if (morning) {
-            parts.push(`<dream-context>\nOvernight processing results (treat as background intelligence):\n${morning}\n</dream-context>`);
+          // 1. Preload intelligence: morning context + confirmed patterns + high-importance insights + corrections
+          const intel = await spark.preloadIntelligence();
+
+          if (intel.morning) {
+            parts.push(`<dream-context>\nOvernight processing results:\n${intel.morning}\n</dream-context>`);
             api.logger.info?.("spark-memory: injecting dream morning context");
           }
 
-          // 2. Recall relevant memories for the current prompt
+          if (intel.patterns.length > 0) {
+            const patternLines = intel.patterns.map((p: any) => `- ${p.content}`).join('\n');
+            parts.push(`<confirmed-patterns>\nVerified behavioral patterns (confirmed 3+ times):\n${patternLines}\n</confirmed-patterns>`);
+            api.logger.info?.(`spark-memory: injecting ${intel.patterns.length} confirmed patterns`);
+          }
+
+          if (intel.insights.length > 0) {
+            const insightLines = intel.insights.map((i: any) => `- [${i.reflection_type}] ${i.content}`).join('\n');
+            parts.push(`<key-insights>\nHigh-importance reflections:\n${insightLines}\n</key-insights>`);
+            api.logger.info?.(`spark-memory: injecting ${intel.insights.length} key insights`);
+          }
+
+          if (intel.corrections.length > 0) {
+            const corrLines = intel.corrections.map((c: any) => `- ${c.content}`).join('\n');
+            parts.push(`<corrections>\nPrevious corrections (highest priority — do not repeat these mistakes):\n${corrLines}\n</corrections>`);
+            api.logger.info?.(`spark-memory: injecting ${intel.corrections.length} corrections`);
+          }
+
+          // 2. Also recall relevant memories for the current prompt
           const memories = await spark.recall(event.prompt, 5);
           if (memories.length > 0) {
             parts.push(formatMemoriesForContext(memories));
-            api.logger.info?.(`spark-memory: injecting ${memories.length} memories into context`);
+            api.logger.info?.(`spark-memory: injecting ${memories.length} recalled memories`);
           }
 
           if (parts.length === 0) return;
