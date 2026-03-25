@@ -130,6 +130,27 @@ function looksLikePromptInjection(text: string): boolean {
   return PROMPT_INJECTION_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
+function sanitizeMemoryContent(text: string): string {
+  const injectionPatterns = [
+    /ignore (all|any|previous|above|prior) instructions/gi,
+    /do not follow (the )?(system|developer)/gi,
+    /system prompt/gi,
+    /developer message/gi,
+    /<\s*(system|assistant|developer|tool|function)\b[^>]*>/gi,
+    /\b(run|execute|call|invoke)\b.{0,40}\b(tool|command)\b/gi,
+    /forget (all|everything|your) (instructions|rules|guidelines)/gi,
+    /you are now/gi,
+    /new instructions:/gi,
+    /override:/gi,
+  ];
+
+  let cleaned = text;
+  for (const pattern of injectionPatterns) {
+    cleaned = cleaned.replace(pattern, '[REDACTED]');
+  }
+  return cleaned;
+}
+
 function shouldCapture(text: string): boolean {
   if (text.length < 15 || text.length > 1000) return false;
   if (SKIP_PATTERNS.some(p => p.test(text))) return false;
@@ -549,7 +570,8 @@ const sparkMemoryPlugin = {
           let stored = 0;
           for (const text of toCapture.slice(0, 3)) {
             const { type, importance } = detectEpisodeType(text);
-            await spark.record(text, type, importance, { source: 'auto_capture' });
+            const sanitized = sanitizeMemoryContent(text);
+            await spark.record(sanitized, type, importance, { source: 'auto_capture' });
             stored++;
           }
 
