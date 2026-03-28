@@ -15,7 +15,10 @@
   "openclaw": {
     "extensions": [
       "./index.ts"
-    ]
+    ],
+    "compat": {
+      "pluginApi": ">=1.0.0"
+    }
   },
   "author": "Zellin Unlimited <hello@zellin.ai>",
   "license": "MIT",
