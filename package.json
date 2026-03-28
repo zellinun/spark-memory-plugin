@@ -1,7 +1,7 @@
 {
   "name": "@zellin/spark-memory",
-  "version": "0.1.0",
-  "description": "Persistent memory plugin for OpenClaw — records what matters, reflects overnight, recalls with intelligence",
+  "version": "0.2.0",
+  "description": "Intelligence layer that compounds. Records decisions, reflects overnight, detects patterns, captures sessions automatically — your agent gets smarter every day.",
   "main": "index.ts",
   "type": "module",
   "keywords": [

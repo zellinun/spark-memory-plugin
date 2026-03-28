@@ -234,7 +234,7 @@ function formatMemoriesForContext(memories: any[]): string {
 const sparkMemoryPlugin = {
   id: "spark-memory",
   name: "Spark Memory",
-  description: "Persistent memory that learns — records what matters, reflects overnight, recalls with intelligence. Powered by Spark.",
+  description: "Intelligence layer that compounds. Records decisions, reflects overnight, detects patterns, captures sessions automatically — your agent gets smarter every day. Powered by Spark.",
   kind: "memory" as const,
 
   register(api: OpenClawPluginApi) {
@@ -242,6 +242,47 @@ const sparkMemoryPlugin = {
     const spark = new SparkClient(cfg.apiUrl, cfg.apiKey, cfg.orgId);
 
     api.logger.info(`spark-memory: registered (org: ${cfg.orgId.slice(0, 8)}...)`);
+
+    // Session synthesis accumulator
+    let messageBuffer: string[] = [];
+    let lastSynthesisTime = Date.now();
+    const SYNTHESIS_INTERVAL_TURNS = 10;  // Synthesize every 10 turns
+    const SYNTHESIS_INTERVAL_MS = 30 * 60 * 1000;  // Or every 30 minutes of activity
+    let turnsSinceLastSynthesis = 0;
+
+    async function synthesizeAndRecord(reason: string) {
+      if (messageBuffer.length < 3) {
+        // Not enough content to synthesize
+        messageBuffer = [];
+        turnsSinceLastSynthesis = 0;
+        lastSynthesisTime = Date.now();
+        return;
+      }
+
+      try {
+        const conversationText = messageBuffer.join('\n---\n').slice(0, 8000);  // Cap at 8K chars
+
+        // Use Spark's record endpoint with a synthesis prompt prefix
+        // Record as a structured conversation episode with high importance
+        const summary = 'Session activity (' + messageBuffer.length + ' user messages, ' + reason + '). Topics: ' + conversationText.slice(0, 500);
+
+        await spark.record(
+          summary,
+          'conversation',
+          6,
+          { source: 'session_synthesis', reason, message_count: messageBuffer.length }
+        );
+
+        api.logger.info('spark-memory: session synthesis recorded (' + reason + ', ' + messageBuffer.length + ' messages)');
+      } catch (err) {
+        api.logger.warn('spark-memory: session synthesis failed: ' + String(err));
+      }
+
+      // Reset
+      messageBuffer = [];
+      turnsSinceLastSynthesis = 0;
+      lastSynthesisTime = Date.now();
+    }
 
     // ========================================================================
     // Tools
@@ -567,6 +608,25 @@ const sparkMemoryPlugin = {
       api.on("agent_end", async (event) => {
         if (!event.success || !event.messages || event.messages.length === 0) return;
 
+        // Accumulate user messages for session synthesis
+        for (const msg of event.messages || []) {
+          if (!msg || typeof msg !== 'object') continue;
+          const msgObj = msg as Record<string, unknown>;
+          if (msgObj.role === 'user' && typeof msgObj.content === 'string' && msgObj.content.length > 10) {
+            messageBuffer.push(msgObj.content);
+          }
+        }
+        turnsSinceLastSynthesis++;
+
+        // Check if we should synthesize
+        const timeSinceLastSynthesis = Date.now() - lastSynthesisTime;
+        if (turnsSinceLastSynthesis >= SYNTHESIS_INTERVAL_TURNS ||
+            timeSinceLastSynthesis >= SYNTHESIS_INTERVAL_MS) {
+          await synthesizeAndRecord(
+            turnsSinceLastSynthesis >= SYNTHESIS_INTERVAL_TURNS ? 'turn_threshold' : 'time_threshold'
+          );
+        }
+
         try {
           const texts: string[] = [];
           for (const msg of event.messages) {
@@ -619,6 +679,51 @@ const sparkMemoryPlugin = {
         }
       });
     }
+
+    // Synthesize before compaction — capture what's about to be forgotten
+    api.on('before_compaction', async (event) => {
+      api.logger.info('spark-memory: compaction detected (' + (event.messageCount || '?') + ' messages), synthesizing...');
+
+      // If we have accumulated messages, synthesize them
+      if (messageBuffer.length >= 3) {
+        await synthesizeAndRecord('before_compaction');
+      }
+
+      // Also try to capture from the session file if available
+      if (event.sessionFile) {
+        try {
+          const fs = await import('node:fs');
+          const content = fs.readFileSync(event.sessionFile, 'utf-8');
+          const lines = content.split('\n').filter(Boolean);
+
+          // Extract user messages from JSONL
+          const userMessages: string[] = [];
+          for (const line of lines.slice(-50)) {  // Last 50 messages
+            try {
+              const msg = JSON.parse(line);
+              if (msg.role === 'user' && typeof msg.content === 'string' && msg.content.length > 20) {
+                userMessages.push(msg.content.slice(0, 500));
+              }
+            } catch { /* skip malformed lines */ }
+          }
+
+          if (userMessages.length >= 3) {
+            const compactionSummary = 'Pre-compaction capture (' + userMessages.length + ' user messages, ' + (event.messageCount || '?') + ' total). Topics: ' + userMessages.join(' | ').slice(0, 2000);
+            await spark.record(compactionSummary, 'conversation', 7, { source: 'compaction_capture', message_count: event.messageCount });
+            api.logger.info('spark-memory: compaction capture recorded (' + userMessages.length + ' user messages)');
+          }
+        } catch (err) {
+          api.logger.warn('spark-memory: compaction file read failed: ' + String(err));
+        }
+      }
+    });
+
+    // Synthesize on explicit session end
+    api.on('session_end', async () => {
+      if (messageBuffer.length >= 2) {
+        await synthesizeAndRecord('session_end');
+      }
+    });
 
     // ========================================================================
     // Service
