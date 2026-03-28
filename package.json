@@ -1,6 +1,6 @@
 {
   "name": "@zellin/spark-memory",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Intelligence layer that compounds. Records decisions, reflects overnight, detects patterns, captures sessions automatically — your agent gets smarter every day.",
   "main": "index.ts",
   "type": "module",

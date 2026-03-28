@@ -15,8 +15,8 @@
     },
     "apiUrl": {
       "label": "API URL",
-      "placeholder": "https://aotmggizxfetxguthmuf.supabase.co/functions/v1",
-      "help": "Spark API endpoint (default is fine for most users)",
+      "placeholder": "https://zellin.ai/api",
+      "help": "Spark API endpoint — default points to zellin.ai (Zellin's official API domain)",
       "advanced": true
     },
     "autoCapture": {

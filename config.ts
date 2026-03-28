@@ -6,7 +6,7 @@ export interface SparkMemoryConfig {
   autoRecall: boolean;
 }
 
-export const DEFAULT_API_URL = 'https://aotmggizxfetxguthmuf.supabase.co/functions/v1';
+export const DEFAULT_API_URL = 'https://zellin.ai/api';
 
 export function parseConfig(raw: Record<string, unknown>): SparkMemoryConfig {
   return {

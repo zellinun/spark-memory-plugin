@@ -119,7 +119,6 @@ const CAPTURE_TRIGGERS = [
   /\bpolicy:?\s/i,
 
   // Business facts
-  /\b(gate code|password|pin|access code)\b/i,
   /\b(hours are|pricing is|we charge|rate is|costs?)\b/i,
   /\b(my (name|email|phone|address) is)\b/i,
   /[\w.-]+@[\w.-]+\.\w+/,       // emails
@@ -148,6 +147,7 @@ function looksLikePromptInjection(text: string): boolean {
 }
 
 function sanitizeMemoryContent(text: string): string {
+  // Prompt injection patterns
   const injectionPatterns = [
     /ignore (all|any|previous|above|prior) instructions/gi,
     /do not follow (the )?(system|developer)/gi,
@@ -165,6 +165,13 @@ function sanitizeMemoryContent(text: string): string {
   for (const pattern of injectionPatterns) {
     cleaned = cleaned.replace(pattern, '[REDACTED]');
   }
+
+  // PII/secret redaction — never store these
+  cleaned = cleaned.replace(/\b(password|passwd|pwd)\s*[:=]\s*\S+/gi, '[PASSWORD REDACTED]');
+  cleaned = cleaned.replace(/\b(pin|access.?code|gate.?code)\s*[:=]?\s*\d{3,}/gi, '[ACCESS CODE REDACTED]');
+  cleaned = cleaned.replace(/\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g, '[SSN REDACTED]');  // SSN pattern
+  cleaned = cleaned.replace(/\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b/g, '[CARD REDACTED]');  // Credit card
+
   return cleaned;
 }
 
@@ -193,7 +200,7 @@ function detectEpisodeType(text: string): { type: string; importance: number } {
     return { type: 'action', importance: 7 };
   }
   // Business facts (7)
-  if (/gate code|password|pin|access|hours are|pricing|charge|rate/i.test(lower)) {
+  if (/hours are|pricing|charge|rate/i.test(lower)) {
     return { type: 'observation', importance: 7 };
   }
   // Preferences (6)
