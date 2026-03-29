@@ -120,9 +120,7 @@ const CAPTURE_TRIGGERS = [
 
   // Business facts
   /\b(hours are|pricing is|we charge|rate is|costs?)\b/i,
-  /\b(my (name|email|phone|address) is)\b/i,
-  /[\w.-]+@[\w.-]+\.\w+/,       // emails
-  /\+?\d[\d\s-]{9,}/,           // phone numbers
+  /\b(my (name|address) is)\b/i,
 ];
 
 const SKIP_PATTERNS = [
@@ -171,6 +169,8 @@ function sanitizeMemoryContent(text: string): string {
   cleaned = cleaned.replace(/\b(pin|access.?code|gate.?code)\s*[:=]?\s*\d{3,}/gi, '[ACCESS CODE REDACTED]');
   cleaned = cleaned.replace(/\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g, '[SSN REDACTED]');  // SSN pattern
   cleaned = cleaned.replace(/\b\d{4}[-.\s]?\d{4}[-.\s]?\d{4}[-.\s]?\d{4}\b/g, '[CARD REDACTED]');  // Credit card
+  cleaned = cleaned.replace(/[\w.-]+@[\w.-]+\.\w{2,}/g, '[EMAIL REDACTED]');  // Email addresses
+  cleaned = cleaned.replace(/\+?\d[\d\s-]{9,}\d/g, '[PHONE REDACTED]');  // Phone numbers (10+ digits)
 
   return cleaned;
 }
@@ -241,7 +241,7 @@ function formatMemoriesForContext(memories: any[]): string {
 const sparkMemoryPlugin = {
   id: "spark-memory",
   name: "Spark Memory",
-  description: "Intelligence layer that compounds. Records decisions, reflects overnight, detects patterns, captures sessions automatically — your agent gets smarter every day. Powered by Spark.",
+  description: "Intelligence layer that compounds. Records decisions, reflects overnight, detects patterns. Auto-capture stores important facts from conversations (emails/phones/passwords are redacted before upload). Memories are org-scoped — all agents in an org share the same memory. Disable autoCapture in config to control what gets stored. Powered by Spark (zellin.ai).",
   kind: "memory" as const,
 
   register(api: OpenClawPluginApi) {
